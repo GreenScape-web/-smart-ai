@@ -104,7 +104,7 @@
         <div class="flex items-center space-x-2">
             <!-- Settings button on the far left -->
             <button id="settings-button" class="text-gray-600 dark:text-gray-300 focus:outline-none p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.942 3.313.841 2.37 2.373a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.942 1.543-.841 3.313-2.373 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.942-3.313-.841-2.37-2.373a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.942-1.543.841-3.313 2.373-2.37a1.724 1.724 0 002.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.942 3.313.841 2.37 2.373a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.942 1.543-.841 3.313-2.373 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.942-3.313-.841-2.37-2.373a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.942-1.543.841-3.313 2.373-2.37a1.724 1.724 0 002.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 11-6 0 3 3 0 016 0z"></path></svg>
             </button>
         </div>
     </div>
@@ -182,8 +182,6 @@
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-2">نماذج الذكاء الاصطناعي</h3>
                     <select id="model-select" class="w-full py-2 px-3 rounded-md border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:outline-none">
                         <option value="gemini-flash">Gemini Flash</option>
-                        <option value="gemini-pro">Gemini Pro (مستقبلي)</option>
-                        <option value="chatgpt-4o">ChatGPT-4o (مستقبلي)</option>
                     </select>
                 </div>
 
@@ -264,12 +262,13 @@
         const themeToggle = document.getElementById('theme-toggle');
         const clearChatButton = document.getElementById('clear-chat-button');
         const body = document.body;
+        const modelSelect = document.getElementById('model-select');
 
         // Firebase variables
         let db, auth, userId;
-        let chatHistory = [];
         let isAuthReady = false;
         let isGenerating = false;
+        let initialMessageRendered = false;
 
         // --- Firebase Initialization and Auth ---
         function initializeFirebase() {
@@ -304,42 +303,31 @@
             const q = query(chatCollection, orderBy('timestamp'));
 
             onSnapshot(q, (snapshot) => {
-                let newMessages = [];
-                snapshot.forEach((doc) => {
+                // Clear and re-render all messages to ensure correct order
+                messagesContainer.innerHTML = '';
+                
+                snapshot.docs.forEach(doc => {
                     const data = doc.data();
-                    newMessages.push(data);
+                    if (data.role === 'user') {
+                        if (data.text) {
+                            displayMessage(data.text, 'sent-message');
+                        }
+                        if (data.image) {
+                            displayImage(data.image.data, 'sent-message');
+                        }
+                    } else if (data.role === 'model') {
+                        if (data.text) {
+                            displayMessage(data.text, 'received-message');
+                        }
+                        if (data.image) {
+                            displayImage(data.image.data, 'received-message');
+                        }
+                    }
                 });
-                // Check if the chat history has changed to avoid unnecessary re-renders
-                if (JSON.stringify(newMessages) !== JSON.stringify(chatHistory)) {
-                    chatHistory = newMessages;
-                    renderMessages();
-                }
             }, (error) => {
                 console.error("Error listening to messages:", error);
                 displayMessage('فشل تحميل سجل المحادثات.', 'received-message');
             });
-        }
-
-        function renderMessages() {
-            messagesContainer.innerHTML = '';
-            chatHistory.forEach(msg => {
-                if (msg.role === 'user') {
-                    if (msg.text) {
-                        displayMessage(msg.text, 'sent-message');
-                    }
-                    if (msg.image) {
-                        displayImage(msg.image.data, 'sent-message');
-                    }
-                } else if (msg.role === 'model') {
-                    if (msg.text) {
-                        displayMessage(msg.text, 'received-message');
-                    }
-                    if (msg.image) {
-                        displayImage(msg.image.data, 'received-message');
-                    }
-                }
-            });
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
         async function saveMessage(role, content) {
@@ -435,9 +423,9 @@
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const base64Image = e.target.result;
-                displayImage(base64Image, 'sent-message');
                 saveMessage('user', { image: { data: base64Image, mimeType: file.type } });
                 await sendToGemini([{ inlineData: { mimeType: file.type, data: base64Image.split(',')[1] } }]);
+                messageInput.focus();
             };
             reader.readAsDataURL(file);
             fileInput.value = ''; // Reset file input
@@ -480,12 +468,23 @@
             const payload = {
                 contents: [{
                     parts: parts
-                }]
+                }],
+                // Enable Google Search grounding for up-to-date and accurate information.
+                tools: [{
+                    "google_search": {}
+                }],
+                systemInstruction: {
+                    parts: [{
+                        // Updated the system instruction to be in Arabic to match the user's language.
+                        text: "تصرف كمساعد مفيد، وموجز، وودود. قدم إجابات قصيرة ومباشرة."
+                    }]
+                }
             };
-
-            // تم لصق مفتاح API الخاص بك هنا
-            const apiKey = "AIzaSyDORk8cWO2S0yOzOAs1EnCObsK03lbk-ys";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            
+            // This is the fix. We are now using the model that does not require an API key.
+            const selectedModel = 'gemini-2.5-flash-preview-05-20';
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
 
             try {
                 const response = await fetch(apiUrl, {
@@ -498,7 +497,6 @@
                 const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || "عذراً، لم أتمكن من توليد رد.";
                 
                 tempMessageDiv.remove();
-                displayMessage(text, 'received-message');
                 saveMessage('model', { text: text });
             } catch (e) {
                 console.error("API call failed:", e);
@@ -508,6 +506,8 @@
                 isGenerating = false;
                 messageInput.disabled = false;
                 sendButton.disabled = false;
+                // Focus the input field after the operation completes
+                messageInput.focus();
             }
         }
 
@@ -522,15 +522,14 @@
             if (isCreatorQuestion) {
                 const creatorResponse = "أنا من تصميم وبرمجة وتدريب المهندس معتصم بالله.";
                 
-                // Save user message and hard-coded response to chat history
+                // Save messages and display hard-coded response without API call
                 saveMessage('user', { text: messageText });
                 saveMessage('model', { text: creatorResponse });
                 
-                // Display messages instantly without API call
-                displayMessage(messageText, 'sent-message');
                 displayMessage(creatorResponse, 'received-message');
 
                 messageInput.value = '';
+                messageInput.focus();
                 return;
             }
             
@@ -608,6 +607,15 @@
                     const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
                     await Promise.all(deletePromises);
                     messagesContainer.innerHTML = '';
+                    // Re-add the initial welcome message after clearing
+                    const welcomeMessageDiv = document.createElement('div');
+                    welcomeMessageDiv.className = 'flex justify-start';
+                    welcomeMessageDiv.innerHTML = `
+                        <div class="message-box received-message">
+                            مرحباً بك! أنا هنا لمساعدتك في أي شيء تحتاجه. كيف يمكنني أن أخدمك اليوم؟
+                        </div>
+                    `;
+                    messagesContainer.appendChild(welcomeMessageDiv);
                 } catch (e) {
                     console.error("Error clearing chat:", e);
                     displayMessage('فشل في مسح سجل المحادثات.', 'received-message');
@@ -617,14 +625,17 @@
             });
         });
 
-        // Initial welcome message
-        messagesContainer.innerHTML = `
-            <div class="flex justify-start">
+        // Initial welcome message check
+        if (messagesContainer.children.length === 0) {
+            const welcomeMessageDiv = document.createElement('div');
+            welcomeMessageDiv.className = 'flex justify-start';
+            welcomeMessageDiv.innerHTML = `
                 <div class="message-box received-message">
                     مرحباً بك! أنا هنا لمساعدتك في أي شيء تحتاجه. كيف يمكنني أن أخدمك اليوم؟
                 </div>
-            </div>
-        `;
+            `;
+            messagesContainer.appendChild(welcomeMessageDiv);
+        }
     </script>
 </body>
 </html>
